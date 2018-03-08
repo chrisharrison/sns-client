@@ -13,14 +13,14 @@ final class ClientFactoryTest extends TestCase
     public function test_constructs_with_correct_endpoint_from_region()
     {
         $factory = new ClientFactory(['test-region' => 'test-endpoint']);
-        $test = $factory->fromAwsCredentials('access-key', 'secret-key', 'test-region', 'test://');
-        $this->assertEquals('test://test-endpoint', $test->getEndpoint());
+        $test = $factory->fromAwsCredentials('access-key', 'secret-key', 'test-region');
+        $this->assertEquals('test-endpoint', $test->getEndpoint());
     }
 
     public function test_constructs_with_correct_endpoint_from_unknown_region()
     {
         $factory = new ClientFactory();
         $test = $factory->fromAwsCredentials('access-key', 'secret-key', 'test-region');
-        $this->assertEquals('https://sns.test-region.amazonaws.com', $test->getEndpoint());
+        $this->assertEquals('sns.test-region.amazonaws.com', $test->getEndpoint());
     }
 }
