@@ -13,9 +13,9 @@ final class ClientFactory
         $this->regionEndpoints = $regionEndpoints ?? $this->defaultRegionEndpoints();
     }
 
-    public function fromAwsCredentials(string $accessKey, string $secretKey, string $region, string $protocol = 'https://'): SnsClient
+    public function fromAwsCredentials(string $accessKey, string $secretKey, string $region): SnsClient
     {
-        return new DefaultSnsClient($accessKey, $secretKey, $protocol . $this->endpointForRegion($region));
+        return new DefaultSnsClient($accessKey, $secretKey, 'https://', $this->endpointForRegion($region));
     }
 
     private function endpointForRegion(string $region): string

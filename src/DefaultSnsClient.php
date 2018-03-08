@@ -6,21 +6,25 @@ namespace ChrisHarrison\SnsClient;
 
 use ChrisHarrison\SnsClient\Exceptions\ApiException;
 use ChrisHarrison\SnsClient\Exceptions\SnsException;
+use function http_build_query;
 use InvalidArgumentException;
 
 final class DefaultSnsClient implements SnsClient
 {
     private $accessKey;
     private $secretKey;
+    private $protocol;
     private $endpoint;
 
     public function __construct(
         string $accessKey,
         string $secretKey,
+        string $protocol,
         string $endpoint
     ) {
         $this->accessKey = $accessKey;
         $this->secretKey = $secretKey;
+        $this->protocol = $protocol;
         $this->endpoint = $endpoint;
     }
 
@@ -32,6 +36,11 @@ final class DefaultSnsClient implements SnsClient
     public function getSecretKey(): string
     {
         return $this->secretKey;
+    }
+
+    public function getProtocol(): string
+    {
+        return $this->protocol;
     }
 
     public function getEndpoint(): string
@@ -80,12 +89,15 @@ final class DefaultSnsClient implements SnsClient
         }
 
         // Finally send request
-        $this->_request('AddPermission', $params);
+        $this->request('AddPermission', $params);
         return true;
     }
 
-    public function confirmSubscription(string $topicArn, string $token, ?bool $authenticateOnUnsubscribe = null): string
-    {
+    public function confirmSubscription(
+        string $topicArn,
+        string $token,
+        ?bool $authenticateOnUnsubscribe = null
+    ): string {
         if (empty($topicArn) || empty($token)) {
             throw new InvalidArgumentException('Must supply a TopicARN and a Token to confirm subscription');
         }
@@ -96,7 +108,7 @@ final class DefaultSnsClient implements SnsClient
         if (!is_null($authenticateOnUnsubscribe)) {
             $params['AuthenticateOnUnsubscribe'] = $authenticateOnUnsubscribe;
         }
-        $resultXml = $this->_request('ConfirmSubscription', $params);
+        $resultXml = $this->request('ConfirmSubscription', $params);
         return strval($resultXml->ConfirmSubscriptionResult->SubscriptionArn);
     }
 
@@ -105,7 +117,7 @@ final class DefaultSnsClient implements SnsClient
         if (empty($name)) {
             throw new InvalidArgumentException('Must supply a Name to create topic');
         }
-        $resultXml = $this->_request('CreateTopic', ['Name' => $name]);
+        $resultXml = $this->request('CreateTopic', ['Name' => $name]);
         return strval($resultXml->CreateTopicResult->TopicArn);
     }
 
@@ -114,7 +126,7 @@ final class DefaultSnsClient implements SnsClient
         if (empty($topicArn)) {
             throw new InvalidArgumentException('Must supply a TopicARN to delete a topic');
         }
-        $this->_request('DeleteTopic', ['TopicArn' => $topicArn]);
+        $this->request('DeleteTopic', ['TopicArn' => $topicArn]);
         return true;
     }
 
@@ -123,10 +135,10 @@ final class DefaultSnsClient implements SnsClient
         if (empty($topicArn)) {
             throw new InvalidArgumentException('Must supply a TopicARN to get topic attributes');
         }
-        $resultXml = $this->_request('GetTopicAttributes', ['TopicArn' => $topicArn]);
+        $resultXml = $this->request('GetTopicAttributes', ['TopicArn' => $topicArn]);
         // Get attributes
         $attributes = $resultXml->GetTopicAttributesResult->Attributes->entry;
-        // Unfortunately cannot use _processXmlToArray here, so process manually
+        // Unfortunately cannot use processXmlToArray here, so process manually
         $returnArray = [];
         // Process into array
         foreach ($attributes as $attribute) {
@@ -142,10 +154,10 @@ final class DefaultSnsClient implements SnsClient
         if (!is_null($nextToken)) {
             $params['NextToken'] = $nextToken;
         }
-        $resultXml = $this->_request('ListSubscriptions', $params);
+        $resultXml = $this->request('ListSubscriptions', $params);
         // Get subscriptions
         $subs = $resultXml->ListSubscriptionsResult->Subscriptions->member;
-        $return = ['members' => $this->_processXmlToArray($subs)];
+        $return = ['members' => $this->processXmlToArray($subs)];
         if (isset($resultXml->ListSubscriptionsResult->NextToken)) {
             $return['nextToken'] = strval($resultXml->ListSubscriptionsResult->NextToken);
         }
@@ -163,10 +175,10 @@ final class DefaultSnsClient implements SnsClient
         if (!is_null($nextToken)) {
             $params['NextToken'] = $nextToken;
         }
-        $resultXml = $this->_request('ListSubscriptionsByTopic', $params);
+        $resultXml = $this->request('ListSubscriptionsByTopic', $params);
         // Get subscriptions
         $subs = $resultXml->ListSubscriptionsByTopicResult->Subscriptions->member;
-        $return = ['members' => $this->_processXmlToArray($subs)];
+        $return = ['members' => $this->processXmlToArray($subs)];
         if (isset($resultXml->ListSubscriptionsByTopicResult->NextToken)) {
             $return['nextToken'] = strval($resultXml->ListSubscriptionsByTopicResult->NextToken);
         }
@@ -179,14 +191,18 @@ final class DefaultSnsClient implements SnsClient
         if (!is_null($nextToken)) {
             $params['NextToken'] = $nextToken;
         }
-        $resultXml = $this->_request('ListTopics', $params);
+        $resultXml = $this->request('ListTopics', $params);
         // Get Topics
         $topics = $resultXml->ListTopicsResult->Topics->member;
-        return $this->_processXmlToArray($topics);
+        return $this->processXmlToArray($topics);
     }
 
-    public function publish(string $topicArn, string$message, string $subject = '', string $messageStructure = ''): string
-    {
+    public function publish(
+        string $topicArn,
+        string$message,
+        string $subject = '',
+        string $messageStructure = ''
+    ): string {
         if (empty($topicArn) || empty($message)) {
             throw new InvalidArgumentException('Must supply a TopicARN and Message to publish to a topic');
         }
@@ -200,7 +216,7 @@ final class DefaultSnsClient implements SnsClient
         if (!empty($messageStructure)) {
             $params['MessageStructure'] = $messageStructure;
         }
-        $resultXml = $this->_request('Publish', $params);
+        $resultXml = $this->request('Publish', $params);
         return strval($resultXml->PublishResult->MessageId);
     }
 
@@ -209,16 +225,18 @@ final class DefaultSnsClient implements SnsClient
         if (empty($topicArn) || empty($label)) {
             throw new InvalidArgumentException('Must supply a TopicARN and Label to remove a permission');
         }
-        $this->_request('RemovePermission', ['Label' => $label]);
+        $this->request('RemovePermission', ['Label' => $label]);
         return true;
     }
 
     public function setTopicAttributes(string $topicArn, string $attrName, $attrValue): bool
     {
         if (empty($topicArn) || empty($attrName) || empty($attrValue)) {
-            throw new InvalidArgumentException('Must supply a TopicARN, AttributeName and AttributeValue to set a topic attribute');
+            throw new InvalidArgumentException(
+                'Must supply a TopicARN, AttributeName and AttributeValue to set a topic attribute'
+            );
         }
-        $this->_request('SetTopicAttributes', [
+        $this->request('SetTopicAttributes', [
             'TopicArn' => $topicArn,
             'AttributeName' => $attrName,
             'AttributeValue' => $attrValue,
@@ -231,7 +249,7 @@ final class DefaultSnsClient implements SnsClient
         if (empty($topicArn) || empty($protocol) || empty($endpoint)) {
             throw new InvalidArgumentException('Must supply a TopicARN, Protocol and Endpoint to subscribe to a topic');
         }
-        $response = $this->_request('Subscribe', [
+        $response = $this->request('Subscribe', [
             'TopicArn' => $topicArn,
             'Protocol' => $protocol,
             'Endpoint' => $endpoint,
@@ -244,14 +262,19 @@ final class DefaultSnsClient implements SnsClient
         if (empty($subscriptionArn)) {
             throw new InvalidArgumentException('Must supply a SubscriptionARN to unsubscribe from a topic');
         }
-        $this->_request('Unsubscribe', ['SubscriptionArn' => $subscriptionArn]);
+        $this->request('Unsubscribe', ['SubscriptionArn' => $subscriptionArn]);
         return true;
     }
 
-    public function createPlatformEndpoint(string $platformApplicationArn, string $token, ?string $userData = null): string
-    {
+    public function createPlatformEndpoint(
+        string $platformApplicationArn,
+        string $token,
+        ?string $userData = null
+    ): string {
         if (empty($platformApplicationArn) || empty($token)) {
-            throw new InvalidArgumentException('Must supply a PlatformApplicationArn & Token to create platform endpoint');
+            throw new InvalidArgumentException(
+                'Must supply a PlatformApplicationArn & Token to create platform endpoint'
+            );
         }
         $attributes = [
             'PlatformApplicationArn' => $platformApplicationArn,
@@ -260,7 +283,7 @@ final class DefaultSnsClient implements SnsClient
         if (!empty($userData)) {
             $attributes['CustomUserData'] = $userData;
         }
-        $response = $this->_request('CreatePlatformEndpoint', $attributes);
+        $response = $this->request('CreatePlatformEndpoint', $attributes);
         return strval($response->CreatePlatformEndpointResult->EndpointArn);
     }
 
@@ -269,7 +292,7 @@ final class DefaultSnsClient implements SnsClient
         if (empty($deviceArn)) {
             throw new InvalidArgumentException('Must supply a DeviceARN to remove platform endpoint');
         }
-        $this->_request('DeleteEndpoint', [
+        $this->request('DeleteEndpoint', [
             'EndpointArn' => $deviceArn,
         ]);
         return true;
@@ -280,43 +303,17 @@ final class DefaultSnsClient implements SnsClient
         if (empty($deviceArn) || empty($message)) {
             throw new InvalidArgumentException('Must supply DeviceArn and Message');
         }
-        $resultXml = $this->_request('Publish', [
+        $resultXml = $this->request('Publish', [
                 'TargetArn' => $deviceArn,
                 'Message' => $message,
         ]);
         return strval($resultXml->PublishResult->MessageId);
     }
 
-    private function _request(string $action, array $params = [])
+    private function request(string $action, array $params = [])
     {
-        // Add in required params
         $params['Action'] = $action;
-        $params['AWSAccessKeyId'] = $this->accessKey;
-        $params['Timestamp'] = gmdate('Y-m-d\TH:i:s.000\Z');
-        $params['SignatureVersion'] = 2;
-        $params['SignatureMethod'] = 'HmacSHA256';
-
-        // Sort and encode into string
-        uksort($params, 'strnatcmp');
-        $queryString = '';
-        foreach ($params as $key => $val) {
-            $queryString .= "&{$key}=".rawurlencode($val);
-        }
-        $queryString = substr($queryString, 1);
-
-        // Form request string
-        $requestString = "GET\n"
-            . $this->endpoint."\n"
-            . "/\n"
-            . $queryString;
-
-        // Create signature - Version 2
-        $params['Signature'] = base64_encode(
-            hash_hmac('sha256', $requestString, $this->secretKey, true)
-        );
-
-        // Finally create request
-        $request = $this->endpoint . '/?' . http_build_query($params, '', '&');
+        $request = $this->signedRequest('GET', '', $params);
 
         // Instantiate cUrl and perform request
         $ch = curl_init();
@@ -327,22 +324,60 @@ final class DefaultSnsClient implements SnsClient
         curl_close($ch);
 
         // Load XML response
-        $xmlResponse = simplexml_load_string($output);
+        $xmlResponse = simplexml_load_string((string) $output);
 
         // Check return code
-        if ($this->_checkGoodResponse($info['http_code']) === false) {
-            // Response not in 200 range
-            if (isset($xmlResponse->Error)) {
-                // Amazon returned an XML error
-                throw new SnsException(strval($xmlResponse->Error->Code) . ': ' . strval($xmlResponse->Error->Message), $info['http_code']);
-            } else {
-                // Some other problem
-                throw new ApiException('There was a problem executing this request', $info['http_code']);
-            }
-        } else {
-            // All good
-            return $xmlResponse;
+        if ($this->checkGoodResponse($info['http_code']) === false) {
+            $this->parseXmlErrors($xmlResponse, $info['http_code']);
         }
+
+        return $xmlResponse;
+    }
+
+    private function parseXmlErrors(\SimpleXMLElement $xml, int $errorCode)
+    {
+        if (isset($xml->Errors) && isset($xml->Errors->Error)) {
+            $error = $xml->Errors->Error;
+        }
+
+        if (isset($xml->Error)) {
+            $error = $xml->Error;
+        }
+
+        if (empty($error)) {
+            throw new ApiException('There was a problem executing this request', $errorCode);
+        }
+
+        throw new SnsException(
+            strval($error->Code) . ': ' . strval($error->Message),
+            $errorCode
+        );
+    }
+
+    private function signedRequest(string $httpMethod, string $uri, array $payload): string
+    {
+        $payload['AWSAccessKeyId'] = $this->accessKey;
+        $payload['Timestamp'] = gmdate('Y-m-d\TH:i:s.000\Z');
+        $payload['SignatureVersion'] = 2;
+        $payload['SignatureMethod'] = 'HmacSHA256';
+
+        uksort($payload, 'strnatcmp');
+        $queryString = '';
+        foreach ($payload as $key => $val) {
+            $queryString .= "&{$key}=".rawurlencode((string) $val);
+        }
+        $queryString = substr($queryString, 1);
+
+        $requestString = $httpMethod . "\n"
+            . $this->endpoint . "\n"
+            . $uri . "/\n"
+            . $queryString;
+
+        $payload['Signature'] = base64_encode(
+            hash_hmac('sha256', $requestString, $this->secretKey, true)
+        );
+
+        return $this->protocol . $this->endpoint . '/?' . http_build_query($payload);
     }
 
     /**
@@ -351,7 +386,7 @@ final class DefaultSnsClient implements SnsClient
      * @param int $code
      * @return bool
      */
-    private function _checkGoodResponse($code): bool
+    private function checkGoodResponse($code): bool
     {
         return floor($code / 100) == 2;
     }
@@ -359,10 +394,10 @@ final class DefaultSnsClient implements SnsClient
     /**
      * Transform the standard AmazonSNS XML array format into a normal array
      *
-     * @param SimpleXMLElement $xmlArray
+     * @param \SimpleXMLElement $xmlArray
      * @return array
      */
-    private function _processXmlToArray(SimpleXMLElement $xmlArray): array
+    private function processXmlToArray(\SimpleXMLElement $xmlArray): array
     {
         $returnArray = [];
         // Process into array

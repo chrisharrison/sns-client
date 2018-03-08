@@ -48,6 +48,11 @@ final class DefaultExtendedSnsClient implements ExtendedSnsClient
         return $this->client->getSecretKey();
     }
 
+    public function getProtocol(): string
+    {
+        return $this->client->getProtocol();
+    }
+
     public function getEndpoint(): string
     {
         return $this->client->getEndpoint();

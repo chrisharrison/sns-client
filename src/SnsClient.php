@@ -19,6 +19,11 @@ interface SnsClient
     /**
      * @return string
      */
+    public function getProtocol(): string;
+
+    /**
+     * @return string
+     */
     public function getEndpoint(): string;
 
     /**
@@ -41,7 +46,11 @@ interface SnsClient
      * @param bool|null $authenticateOnUnsubscribe [optional]
      * @return string - SubscriptionARN
      */
-    public function confirmSubscription(string $topicArn, string $token, ?bool $authenticateOnUnsubscribe = null): string;
+    public function confirmSubscription(
+        string $topicArn,
+        string $token,
+        ?bool $authenticateOnUnsubscribe = null
+    ): string;
 
     /**
      * Create an SNS topic
@@ -108,7 +117,12 @@ interface SnsClient
      * @param string $messageStructure [optional] Used when you want to send a different message for each protocol.If you set MessageStructure to json, the value of the Message parameter must: be a syntactically valid JSON object; and contain at least a top-level JSON key of "default" with a value that is a string.
      * @return string
      */
-    public function publish(string $topicArn, string$message, string $subject = '', string $messageStructure = ''): string;
+    public function publish(
+        string $topicArn,
+        string$message,
+        string $subject = '',
+        string $messageStructure = ''
+    ): string;
 
     /**
      * Remove a set of permissions identified by topic and label that was used when creating permissions
@@ -160,7 +174,11 @@ interface SnsClient
      * @param string $userData
      * @return string
      */
-    public function createPlatformEndpoint(string $platformApplicationArn, string $token, ?string $userData = null): string;
+    public function createPlatformEndpoint(
+        string $platformApplicationArn,
+        string $token,
+        ?string $userData = null
+    ): string;
 
     /**
      * Delete endpoint
